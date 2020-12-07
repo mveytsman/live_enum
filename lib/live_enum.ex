@@ -53,27 +53,45 @@ defmodule LiveEnum do
     }
   end
 
+  def append(live_enum, item) do
+    %LiveEnum{ live_enum | appends: live_enum.appends ++ [item] }
+  end
 
- """
-  <%= LiveEnum.cointainer_for message <- @messages, id: "messages", class: "styling classes go here" do %>
-         <div id="<%= LiveEnum.dom_id(@messages, message) %>"><%= message.text %>
-         <button phx-click="delete_messsage" phx-value-id="<%= message.id %>">delete</button>
-         <form phx-change="edit_message"><input type=hidden name="id" value="<%= message.id %>"><input type="text" name="text">
-         </div>
-       <% end %>
-       """
-  defmacro container_for({:<-, _, [varname, live_enum]}, id: container_id, do: block), do: do_container_for(live_enum, container_id, varname, block)
+  def prepend(live_enum, item) do
+    %LiveEnum{ live_enum | prepends: live_enum.prepends ++ [item] }
+  end
+
+  def remove(live_enum, item) do
+    # TODO: Remove vs delete naming?
+    %LiveEnum{ live_enum | deletes: [item | live_enum.deletes] }
+  end
+
+  def update(live_enum, item) do
+    # TODO: handle update & prepend in same operation
+    %LiveEnum{ live_enum | appends: live_enum.appends ++ [item] }
+  end
+
+ #"""
+  #<%= LiveEnum.cointainer_for message <- @messages, id: "messages", class: "styling classes go here" do %>
+   #      <div id="<%= LiveEnum.dom_id(@messages, message) %>"><%= message.text %>
+    #     <button phx-click="delete_messsage" phx-value-id="<%= message.id %>">delete</button>
+     #    <form phx-change="edit_message"><input type=hidden name="id" value="<%= message.id %>"><input type="text" name="text">
+      #   </div>
+       #<% end %>
+       #"""
+  #defmacro container_for({:<-, _, [varname, live_enum]}, container_id: container_id, do: block), do: do_container_for(live_enum, container_id, varname, block)
+  defmacro container_for({:<-, _, [varname, live_enum]}, [container_id: container_id], do: block), do: do_container_for(live_enum, container_id, varname, block)
 
   defp do_container_for(live_enum, container_id, varname, block) do
     quote do
 
-      {items, update_mode} = case unquote(live_enum) do
-        %LiveEnum{appends: appends, prepends: []}  -> {appends, "append"}
-        %LiveEnum{appends: [], prepends: prepends} -> {prepends, "prepend"}
-      end
+      live_enum = unquote(live_enum)
+      update_mode = LiveEnum.get_update_mode(live_enum)
+      additions = LiveEnum.get_additions(live_enum)
 
-      additions = for unquote(varname) <- items, do: unquote(block)
-      deletes = for deleted <- unquote(live_enum).deletes, do: Phoenix.HTML.Tag.tag(:div, [id: __MODULE__.dom_id(unquote(live_enum), deleted), phx_delete: true])
+      additions = for unquote(varname) <- additions, do: unquote(block)
+
+      deletes = for deleted <- live_enum.deletes, do: Phoenix.HTML.Tag.tag(:div, [id: __MODULE__.dom_id(live_enum, deleted), phx_delete: true])
 
       Phoenix.HTML.html_escape(
         [Phoenix.HTML.Tag.content_tag(:div, additions ++ deletes, [id: unquote(container_id), phx_update: update_mode])]
@@ -85,4 +103,10 @@ defmodule LiveEnum do
     live_enum.dom_id_callback.(message)
   end
 
+  def get_update_mode(%LiveEnum{appends: appends, prepends: []}), do: :append
+  def get_update_mode(%LiveEnum{appends: [], prepends: prepends}), do: :prepend
+
+  # TODO handle both append and prepend in same operation
+  def get_additions(%LiveEnum{appends: appends, prepends: []}), do: appends
+  def get_additions(%LiveEnum{appends: [], prepends: prepends}), do: prepends
 end
