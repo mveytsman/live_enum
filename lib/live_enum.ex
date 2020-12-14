@@ -1,5 +1,7 @@
 defmodule LiveEnum do
   use Phoenix.HTML
+
+  import Phoenix.LiveView.Helpers
   @doc """
 
   # `LiveEnum`
@@ -80,9 +82,17 @@ defmodule LiveEnum do
        #<% end %>
        #"""
   #defmacro container_for({:<-, _, [varname, live_enum]}, container_id: container_id, do: block), do: do_container_for(live_enum, container_id, varname, block)
-  defmacro container_for({:<-, _, [varname, live_enum]}, [container_id: container_id], do: block), do: do_container_for(live_enum, container_id, varname, block)
+  defmacro container_for({:<-, _, [varname, live_enum]}, [container_id: container_id], do: block) do
 
-  defp do_container_for(live_enum, container_id, varname, block) do
+  # quote bind_quoted:[operator:operator,lhs:lhs,rhs:rhs]do
+  #   Assertion.Test.assert(operator,lhs,rhs)
+  # end
+
+  # quote do
+  #   Assertion.Test.assert(unquote(operator),unquote(lhs),unquote(rhs))
+  # end
+
+
     quote do
 
       live_enum = unquote(live_enum)
@@ -93,9 +103,29 @@ defmodule LiveEnum do
 
       deletes = for deleted <- live_enum.deletes, do: Phoenix.HTML.Tag.tag(:div, [id: __MODULE__.dom_id(live_enum, deleted), phx_delete: true])
 
-      Phoenix.HTML.html_escape(
-        [Phoenix.HTML.Tag.content_tag(:div, additions ++ deletes, [id: unquote(container_id), phx_update: update_mode])]
-      )
+      #Phoenix.HTML.html_escape(
+      #  [Phoenix.HTML.Tag.content_tag(:div, additions ++ deletes, [id: unquote(container_id), phx_update: update_mode])]
+      #)
+      #%Phoenix.LiveView.Comprehension{
+      #  static: ["<div id=", "\">", "</div>\n"],
+      #  dynamics: for x <- additions do [x, x] end
+      #}
+      # container_id = unquote(container_id)
+
+
+      # EEx.compile_string(expr, options)
+      EEx.compile_string("""
+      <div id="container_id" phx-update="<%= #{update_mode} %>">
+        <%= for item <- ["a", "b", "c"] do %>
+          <%= item %>
+        <% end %>
+      </div>
+      """, options = [
+        engine: Phoenix.LiveView.Engine,
+        file: unquote(__CALLER__.file),
+        line: unquote(__CALLER__.line + 1),
+        indentation: 0
+      ])
     end
   end
 

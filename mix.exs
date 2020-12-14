@@ -21,7 +21,8 @@ defmodule LiveEnum.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:phoenix_html, "~> 2.14.0"}
+      {:phoenix_html, "~> 2.14.0"},
+      {:phoenix_live_view, "~> 0.15.0"}
     ]
   end
 end
