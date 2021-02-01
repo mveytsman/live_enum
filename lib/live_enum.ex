@@ -22,7 +22,7 @@ defmodule LiveEnum do
   `prepend(live_enum, item)`
   `item` will be rendered at the beginning of the list
 
-  `remove(live_enum, item)`
+  `delete(live_enum, item)`
   `item` will be removed from the rendered list
 
   `update(live_enum, item)`
@@ -61,17 +61,17 @@ defmodule LiveEnum do
   end
 
   def prepend(live_enum, item) do
-    %LiveEnum{live_enum | prepends: live_enum.prepends ++ [item]}
+    %LiveEnum{live_enum | prepends: [item | live_enum.prepends]}
   end
 
-  def remove(live_enum, item) do
+  def delete(live_enum, id) do
     # TODO: Remove vs delete naming?
-    %LiveEnum{live_enum | deletes: [item | live_enum.deletes]}
+    %LiveEnum{live_enum | deletes: [id | live_enum.deletes]}
   end
 
   def update(live_enum, item) do
     # TODO: handle update &  prepend in same operation
-    %LiveEnum{live_enum | appends: live_enum.appends ++ [item]}
+    %LiveEnum{live_enum | appends: [item | live_enum.appends]}
   end
 
 
@@ -180,22 +180,24 @@ end
     IO.inspect(Macro.to_string(block))
 
     fingerprint1 = fingerprint(block, ["",""])
-    fingerprint2 = fingerprint({})
+    fingerprint2 = fingerprint(fingerprint1, [~s(<div id="), ~s(" phx-update="), ~s(">), "</div>"])
     quote do
       var!(container_id) = unquote(container_id)
       var!(live_enum) = unquote(live_enum)
       #var!(block) = unquote(block)
-
+      var!(additions) = for(unquote(varname) <- LiveEnum.get_additions(var!(live_enum))) do
+        [Phoenix.LiveView.Engine.safe_to_iodata(unquote(block))]
+      end
+      var!(deletes) = for id <- LiveEnum.get_deletes(var!(live_enum)) do ["<div id=#{id} phx-remove>Carl</div>"] end
       comprehension = %Phoenix.LiveView.Comprehension{
         static: ["",""],
-        dynamics: for(unquote(varname) <- LiveEnum.get_additions(var!(live_enum))) do
-           [Phoenix.LiveView.Engine.safe_to_iodata(unquote(block))]
-        end, fingerprint: unquote(fingerprint1)}
+        dynamics: var!(additions) ++ var!(deletes),
+        fingerprint: unquote(fingerprint1)}
 
       %Phoenix.LiveView.Rendered{
         static: [~s(<div id="), ~s(" phx-update="), ~s(">), "</div>"],
         dynamic: fn _ -> [var!(container_id), LiveEnum.get_update_mode(var!(live_enum)), comprehension] end,
-        fingerprint: 420
+        fingerprint: unquote(fingerprint2)
       }
       #[~s(<div id="), var!(container_id), ~s(phx-update="), LiveEnum.get_update_mode(var!(live_enum)), ~s(">), comprehension, "</div>"]
 
@@ -301,4 +303,7 @@ end
   # TODO handle both append and prepend in same operation
   def get_additions(%LiveEnum{appends: appends, prepends: []}), do: appends
   def get_additions(%LiveEnum{appends: [], prepends: prepends}), do: prepends
+
+  def get_deletes(%LiveEnum{deletes: deletes}), do: deletes
+
 end
