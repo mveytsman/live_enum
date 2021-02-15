@@ -74,6 +74,9 @@ defmodule LiveEnum do
     %LiveEnum{live_enum | appends: [item | live_enum.appends]}
   end
 
+  def reset(live_enum) do
+    %LiveEnum{live_enum | appends: [], prepends: [], deletes: []}
+  end
 
   # """
   # <%= LiveEnum.cointainer_for message <- @messages, id: "messages", class: "styling classes go here" do %>
@@ -188,7 +191,7 @@ end
       var!(additions) = for(unquote(varname) <- LiveEnum.get_additions(var!(live_enum))) do
         [Phoenix.LiveView.Engine.safe_to_iodata(unquote(block))]
       end
-      var!(deletes) = for id <- LiveEnum.get_deletes(var!(live_enum)) do ["<div id=#{id} phx-remove>Carl</div>"] end
+      var!(deletes) = for id <- LiveEnum.get_deletes(var!(live_enum)) do ["<div id=\"#{container_id}-#{id}\" phx-remove>Carl</div>"] end
       comprehension = %Phoenix.LiveView.Comprehension{
         static: ["",""],
         dynamics: var!(additions) ++ var!(deletes),
