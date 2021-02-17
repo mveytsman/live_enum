@@ -125,34 +125,36 @@ defmodule LiveEnum do
   defp get_update_mode(%LiveEnum{appends: appends, prepends: []}), do: "append"
   defp get_update_mode(%LiveEnum{appends: [], prepends: prepends}), do: "prepend"
 
-  # TODO handle both append and prepend in same operation
-  def get_additions(%LiveEnum{appends: appends, prepends: []}), do: appends
-  def get_additions(%LiveEnum{appends: [], prepends: prepends}), do: prepends
 
   defp get_deletes(%LiveEnum{deletes: deletes}), do: deletes
 
   defimpl Enumerable do
+
+    # TODO handle both append and prepend in same operation
+    defp get_additions(%LiveEnum{appends: appends, prepends: []}), do: appends
+    defp get_additions(%LiveEnum{appends: [], prepends: prepends}), do: prepends
+
     @impl Enumerable
     def count(live_enum) do
-      LiveEnum.get_additions(live_enum)
+      get_additions(live_enum)
       |> Enumerable.count()
     end
 
     @impl Enumerable
     def member?(live_enum, element) do
-      LiveEnum.get_additions(live_enum)
+      get_additions(live_enum)
       |> Enumerable.member?(element)
     end
 
     @impl Enumerable
     def reduce(live_enum, acc, fun) do
-      LiveEnum.get_additions(live_enum)
+      get_additions(live_enum)
       |> Enumerable.reduce(acc, fun)
     end
 
     @impl Enumerable
     def slice(live_enum) do
-      LiveEnum.get_additions(live_enum)
+      get_additions(live_enum)
       |> Enumerable.slice()
     end
   end
