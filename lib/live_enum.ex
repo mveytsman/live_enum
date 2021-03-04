@@ -136,26 +136,23 @@ defmodule LiveEnum do
 
     @impl Enumerable
     def count(live_enum) do
-      get_additions(live_enum)
-      |> Enumerable.count()
+      {:error, Enumerable.LiveEnum}
     end
 
     @impl Enumerable
     def member?(live_enum, element) do
-      get_additions(live_enum)
-      |> Enumerable.member?(element)
+      {:error, Enumerable.LiveEnum}
     end
 
     @impl Enumerable
     def reduce(live_enum, acc, fun) do
       get_additions(live_enum)
-      |> Enumerable.reduce(acc, fun)
+      |> Enumerable.List.reduce(acc, fun)
     end
 
     @impl Enumerable
     def slice(live_enum) do
-      get_additions(live_enum)
-      |> Enumerable.slice()
+      {:error, Enumerable.LiveEnum}
     end
   end
 end
