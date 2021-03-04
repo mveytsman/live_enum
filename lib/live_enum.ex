@@ -90,6 +90,10 @@ defmodule LiveEnum do
     %LiveEnum{live_enum | prepends: [item | live_enum.prepends]}
   end
 
+  def prepend_list(live_enum, items) do
+    %LiveEnum{live_enum | prepends: items ++ live_enum.prepends}
+  end
+
   def delete(live_enum, id) do
     # TODO: Remove vs delete naming?
     %LiveEnum{live_enum | deletes: [id | live_enum.deletes]}
