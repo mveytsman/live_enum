@@ -51,8 +51,13 @@ defmodule LiveEnum do
     defimpl Phoenix.HTML.Safe do
       @impl Phoenix.HTML.Safe
       def to_iodata(
-            %Container{tag: tag, id: id, update_mode: update_mode, deleted_ids: deleted_ids, attrs: attrs} =
-              container
+            %Container{
+              tag: tag,
+              id: id,
+              update_mode: update_mode,
+              deleted_ids: deleted_ids,
+              attrs: attrs
+            } = container
           ) do
         attrs =
           attrs
@@ -61,10 +66,10 @@ defmodule LiveEnum do
 
         [
           Phoenix.HTML.Safe.to_iodata(Phoenix.HTML.Tag.tag(tag, attrs)),
-          for item_id <- deleted_ids do
+          for {item_id, generation} <- deleted_ids do
             Phoenix.HTML.Safe.to_iodata(
               Phoenix.HTML.Tag.content_tag(:div, [],
-                id: LiveEnum.item_id(container, item_id),
+                id: LiveEnum.item_id(container, item_id, generation),
                 phx_remove: true
               )
             )
@@ -74,20 +79,52 @@ defmodule LiveEnum do
     end
   end
 
-  defstruct [appends: [], prepends: [], deletes: []]
+  defstruct appends: [], prepends: [], deletes: [], foo: %{}
 
-  def create(enum) do
+  def create(pairs) do
+    appends = for {id, item} <- pairs, do: {id, 0, item}
+    foo = for {id, _} <- pairs, into: %{}, do: {id, 0}
+
     %LiveEnum{
-      appends: enum
+      appends: appends,
+      foo: foo
     }
   end
 
-  def append(live_enum, item) do
-    %LiveEnum{live_enum | appends: live_enum.appends ++ [item]}
+  def append(live_enum, id, item) do
+    case Map.fetch(live_enum.foo, id) do
+      {:ok, generation} ->
+        %LiveEnum{
+          live_enum
+          | appends: live_enum.appends ++ [{id, generation + 1, item}],
+            foo: %{live_enum.foo | id => generation + 1},
+            deletes: live_enum.deletes ++ [{id, generation}]
+        }
+
+      :error ->
+        %LiveEnum{
+          live_enum
+          | appends: live_enum.appends ++ [{id, 0, item}], foo: Map.put(live_enum.foo, id, 0)
+        }
+    end
   end
 
-  def prepend(live_enum, item) do
-    %LiveEnum{live_enum | prepends: [item | live_enum.prepends]}
+  def prepend(live_enum, id, item) do
+    case Map.fetch(live_enum.foo, id) do
+      {:ok, generation} ->
+        %LiveEnum{
+          live_enum
+          | prepends: live_enum.prepends ++ [{id, generation + 1, item}],
+            foo: %{live_enum.foo | id => generation + 1},
+            deletes: live_enum.deletes ++ [{id, generation}]
+        }
+
+      :error ->
+        %LiveEnum{
+          live_enum
+          | prepends: live_enum.prepends ++ [{id, 0, item}, foo: %{live_enum.foo | id => 0}]
+        }
+    end
   end
 
   def prepend_list(live_enum, items) do
@@ -96,22 +133,35 @@ defmodule LiveEnum do
 
   def delete(live_enum, id) do
     # TODO: Remove vs delete naming?
-    %LiveEnum{live_enum | deletes: [id | live_enum.deletes]}
+    case Map.fetch(live_enum.foo, id) do
+      {:ok, generation} -> %LiveEnum{live_enum | deletes: [{id, generation} | live_enum.deletes]}
+      :error -> live_enum
+    end
   end
 
-  def update(live_enum, item) do
+  def update(live_enum, id, item) do
     # TODO: handle update &  prepend in same operation
-    %LiveEnum{live_enum | appends: [item | live_enum.appends]}
+    case Map.fetch(live_enum.foo, id) do
+      {:ok, generation} ->
+        %LiveEnum{
+          live_enum
+          | appends: live_enum.appends ++ [{id, generation, item}],
+            foo: %{live_enum.foo | id => generation}
+        }
+
+      # %LiveEnum{live_enum | appends: live_enum.appends ++ [{id, generation + 1, item}, foo: %{foo | id => generation + 1}]}
+      :error ->
+        live_enum
+    end
   end
 
-  def reset(_live_enum) do
-    %LiveEnum{}
+  def reset(live_enum) do
+    %LiveEnum{foo: live_enum.foo}
   end
 
   def container_tag(live_enum, tag, id, attrs \\ []) when is_list(attrs) do
     update_mode = get_update_mode(live_enum)
     deletes = get_deletes(live_enum)
-
     %Container{
       live_enum: live_enum,
       tag: tag,
@@ -123,20 +173,32 @@ defmodule LiveEnum do
   end
 
   def item_id(container, id) do
-    "#{container.id}-#{id}"
+    # losing foo here???
+    generation = container.live_enum.foo[id]
+    item_id(container, id, generation)
+  end
+
+  def item_id(container, id, generation) do
+    "#{container.id}-#{id}-#{generation}"
   end
 
   defp get_update_mode(%LiveEnum{appends: appends, prepends: []}), do: "append"
   defp get_update_mode(%LiveEnum{appends: [], prepends: prepends}), do: "prepend"
 
-
   defp get_deletes(%LiveEnum{deletes: deletes}), do: deletes
 
   defimpl Enumerable do
-
     # TODO handle both append and prepend in same operation
-    defp get_additions(%LiveEnum{appends: appends, prepends: []}), do: appends
-    defp get_additions(%LiveEnum{appends: [], prepends: prepends}), do: prepends
+    defp get_additions(%LiveEnum{appends: appends, prepends: []}), do: dedup(appends)
+    defp get_additions(%LiveEnum{appends: [], prepends: prepends}), do: dedup(prepends)
+
+
+    #{1, 0, a}, {2, 0, 5}, {2,0,1}, {1,1,b} => {2,0,1}, {1,1,b}
+    defp dedup(enum) do
+      Enum.reverse(enum)
+      |> Enum.uniq_by(fn {id, _, _} -> id end)
+      |> Enum.reverse()
+    end
 
     @impl Enumerable
     def count(live_enum) do
